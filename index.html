@@ -199,7 +199,7 @@ select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-i
 
   <div class="tabs">
     <div class="tab active" data-tab="log">Log a Guest</div>
-    <div class="tab" data-tab="ledger">The Ledger</div>
+    <div class="tab" data-tab="ledger">The Ledger</div><div class="tab" data-tab="earnings">Earnings</div>
   </div>
 
   <div class="panel active" id="panel-log">
@@ -242,7 +242,7 @@ select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-i
     </div>
   </div>
 
-  <div class="panel" id="panel-ledger">
+  <div class="panel" id="panel-earnings"><div id="monthlyList"></div></div><div class="panel" id="panel-ledger">
     <div class="breakdown" id="breakdown"></div>
     <div id="ledgerList"></div>
   </div>
@@ -271,7 +271,7 @@ const els = {
   form: document.getElementById('bookingForm'),
   formMsg: document.getElementById('formMsg'),
   breakdown: document.getElementById('breakdown'),
-  ledgerList: document.getElementById('ledgerList'),
+  ledgerList: document.getElementById('ledgerList'), monthlyList: document.getElementById('monthlyList'),
 };
 
 function fmtKES(n){
@@ -465,7 +465,7 @@ async function markPaid(id){
 function render(){
   renderStats();
   renderBreakdown();
-  renderLedger();
+  renderLedger();renderMonthly();
 }
 
 function renderStats(){
@@ -531,7 +531,7 @@ function renderLedger(){
   }).join('');
 }
 
-/* ---------- init ---------- */
+function fmtMonth(key){const p=key.split('-');const dt=new Date(Number(p[0]),Number(p[1])-1,1);return dt.toLocaleDateString('en-GB',{month:'long',year:'numeric'});}function renderMonthly(){if(!loaded)return;if(bookings.length===0){els.monthlyList.innerHTML='<div class="empty"><div class="big">No earnings yet</div>Monthly totals will appear here once you log a stay.</div>';return;}const byMonth={};bookings.forEach(b=>{if(!b.checkIn)return;const key=b.checkIn.slice(0,7);if(!byMonth[key])byMonth[key]={paid:0,agreed:0,stays:0};byMonth[key].paid+=b.paid;byMonth[key].agreed+=b.agreed;byMonth[key].stays+=1;});const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));els.monthlyList.innerHTML=months.map(key=>{const m=byMonth[key];const outstanding=Math.max(0,m.agreed-m.paid);return `<div class="entry"><div class="entry-top"><div><div class="entry-name">${fmtMonth(key)}</div><div class="entry-dates">${m.stays} stay${m.stays===1?'':'s'}</div></div><div class="stamp paid">${fmtKES(m.paid)}</div></div><hr class="entry-divider"><div class="entry-grid"><div><span class="k">Collected</span><br><span class="v">${fmtKES(m.paid)}</span></div><div><span class="k">Agreed total</span><br><span class="v">${fmtKES(m.agreed)}</span></div><div><span class="k">Outstanding</span><br><span class="v" style="${outstanding>0?'color:var(--due)':''}">${fmtKES(outstanding)}</span></div></div></div>`;}).join('');}/* ---------- init ---------- */
 (function(){
   const today = new Date().toISOString().slice(0,10);
   document.getElementById('checkIn').value = today;
