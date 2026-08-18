@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Karibu Ledger — Guest &amp; Income Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#1C2B39;
+    --ink-soft:#33475A;
+    --paper:#FBF8F2;
+    --card:#FFFEFB;
+    --brass:#A87C2B;
+    --brass-light:#D9B968;
+    --paid:#3F6B4A;
+    --paid-bg:#E7EFE8;
+    --due:#A23B3B;
+    --due-bg:#F6E8E7;
+    --muted:#7A7267;
+    --line:#E4DDCE;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:640px;
+    margin:0 auto;
+    padding:28px 18px 60px;
+  }
+  header.top{
+    text-align:center;
+    margin-bottom:22px;
+  }
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--brass);
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-optical-sizing:auto;
+    font-weight:600;
+    font-size:34px;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  .subtitle{
+    color:var(--muted);
+    font-size:14px;
+  }
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+    margin:22px 0;
+  }
+  .stat{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 14px;
+  }
+  .stat .label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--muted);
+    margin-bottom:4px;
+  }
+  .stat .value{
+    font-family:'Fraunces',serif;
+    font-size:22px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .stat.due .value{ color:var(--due); }
+  .tabs{
+    display:flex;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:4px;
+    margin-bottom:20px;
+  }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding:10px 12px;
+    border-radius:999px;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    color:var(--muted);
+    transition:background .15s ease, color .15s ease;
+    user-select:none;
+  }
+  .tab.active{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:20px;
+  }
+  .field{ margin-bottom:14px; }
+  .field label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-bottom:5px;
+  }
+  input, select, textarea{
+    width:100%;
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    padding:11px 12px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus, select:focus, textarea:focus{
+    outline:2px solid var(--brass-light);
+    outline-offset:1px;
+    border-color:var(--brass);
+  }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  textarea{ resize:vertical; min-height:56px; }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    border:none; border-radius:9px; padding:12px 18px;
+    font-weight:600; font-size:14px; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .btn-primary{ width:100%; background:var(--ink); color:var(--paper); margin-top:6px; }
+  .btn-primary:disabled{ opacity:.5; cursor:not-allowed; }
+  .btn-ghost{ background:transparent; color:var(--muted); border:1px solid var(--line); padding:7px 12px; font-size:12px; }
+  .btn-paid{ background:var(--paid-bg); color:var(--paid); padding:7px 12px; font-size:12px; border:1px solid transparent; }
+  .form-msg{ font-size:13px; padding:10px 12px; border-radius:8px; margin-bottom:14px; }
+  .form-msg.error{ background:var(--due-bg); color:var(--due); }
+  .form-msg.success{ background:var(--paid-bg); color:var(--paid); }
+  .breakdown{ display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .breakdown .chip{ background:var(--card); border:1px solid var(--line); border-radius:999px; padding:8px 14px; font-size:12px; color:var(--ink-soft); }
+  .breakdown .chip b{ color:var(--ink); }
+  .entry{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; margin-bottom:12px; position:relative; }
+  .entry-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .entry-num{ font-family:'Fraunces',serif; font-size:11px; color:var(--brass); letter-spacing:.06em; margin-bottom:2px; }
+  .entry-name{ font-family:'Fraunces',serif; font-size:19px; font-weight:600; }
+  .entry-dates{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .stamp{ font-family:'Fraunces',serif; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:5px 10px; border-radius:6px; transform:rotate(3deg); white-space:nowrap; border:1.5px solid; }
+  .stamp.paid{ color:var(--paid); border-color:var(--paid); background:var(--paid-bg); }
+  .stamp.due{ color:var(--due); border-color:var(--due); background:var(--due-bg); }
+  .entry-divider{ border:none; border-top:1px dashed var(--line); margin:12px 0; }
+  .entry-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; font-size:13px; }
+  .entry-grid .k{ color:var(--muted); }
+  .entry-grid .v{ font-weight:600; color:var(--ink); }
+  .entry-notes{ font-size:12.5px; color:var(--ink-soft); margin-top:10px; font-style:italic; }
+  .entry-actions{ display:flex; gap:8px; margin-top:14px; justify-content:flex-end; }
+  .empty{ text-align:center; padding:50px 20px; color:var(--muted); }
+  .empty .big{ font-family:'Fraunces',serif; font-size:20px; color:var(--ink); margin-bottom:6px; }
+  .note{ text-align:center; font-size:11.5px; color:var(--muted); margin-top:26px; line-height:1.5; }
+  .loading{ text-align:center; padding:40px; color:var(--muted); font-size:14px; }
+  .conn-banner{ background:var(--due-bg); color:var(--due); border:1px solid var(--due); border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px; line-height:1.5; }
+  .setup-banner{ background:#FFF7E6; color:#7A5A00; border:1px solid #E8C468; border-radius:10px; padding:14px; font-size:13px; margin-bottom:16px; line-height:1.6; }
+  .setup-banner code{ background:#00000012; padding:1px 5px; border-radius:4px; }
+  @media (max-width:380px){ .entry-grid{ grid-template-columns:1fr; } h1{ font-size:28px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="setupBanner" class="setup-banner" style="display:none;"></div>
+  <div id="connBanner" class="conn-banner" style="display:none;"></div>
+
+  <header class="top">
+    <div class="eyebrow">Guest &amp; Income Tracker</div>
+    <h1>Karibu Ledger</h1>
+    <div class="subtitle">One place for every stay — no more relying on memory.</div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="log">Log a Guest</div>
+    <div class="tab" data-tab="ledger">The Ledger</div>
+  </div>
+
+  <div class="panel active" id="panel-log">
+    <div class="card">
+      <div id="formMsg"></div>
+      <form id="bookingForm">
+        <div class="field">
+          <label>Guest full name</label>
+          <input type="text" id="guestName" required placeholder="e.g. Jane Wanjiku">
+        </div>
+        <div class="row2">
+          <div class="field"><label>Phone number</label><input type="tel" id="phone" required placeholder="07XX XXX XXX"></div>
+          <div class="field"><label>ID / Passport (optional)</label><input type="text" id="idNumber" placeholder="Optional"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Check-in date</label><input type="date" id="checkIn" required></div>
+          <div class="field"><label>Check-out date</label><input type="date" id="checkOut" required></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Number of guests</label><input type="number" id="numGuests" min="1" value="1" required></div>
+          <div class="field"><label>Room / unit (optional)</label><input type="text" id="unit" placeholder="e.g. Main house"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Agreed total (KES)</label><input type="number" id="agreed" min="0" step="1" required placeholder="0"></div>
+          <div class="field"><label>Amount paid so far (KES)</label><input type="number" id="paid" min="0" step="1" required placeholder="0"></div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Payment method</label>
+            <select id="method"><option>M-Pesa</option><option>Cash</option><option>Bank transfer</option><option>Other</option></select>
+          </div>
+          <div class="field">
+            <label>Payment received by</label>
+            <select id="receivedBy"><option>Sitter</option><option>Mother</option><option>Other</option></select>
+          </div>
+        </div>
+        <div class="field"><label>Notes (optional)</label><textarea id="notes" placeholder="Anything worth remembering about this stay"></textarea></div>
+        <button type="submit" class="btn btn-primary">Add to ledger</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-ledger">
+    <div class="breakdown" id="breakdown"></div>
+    <div id="ledgerList"></div>
+  </div>
+
+  <div class="note">
+    Anyone with this link and the site's key can view and add entries — share it only with your mum and the sitter.
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   SUPABASE SETUP — paste your own values here before use.
+   Get these from Supabase → Project Settings → API Keys.
+   ========================================================= */
+const SUPABASE_URL = 'https://epeewenzwgcaznmzvtou.supabase.co';   // e.g. https://abcdefgh.supabase.co
+const SUPABASE_KEY = 'sb_publishable_ExYjCKwNoVAFpHvR1Gt4tA_NtO58VzR'; // starts with sb_publishable_ (or your anon key)
+/* ========================================================= */
+
+let sb = null;
+let bookings = [];
+let loaded = false;
+
+const els = {
+  stats: document.getElementById('stats'),
+  tabs: document.querySelectorAll('.tab'),
+  panels: document.querySelectorAll('.panel'),
+  form: document.getElementById('bookingForm'),
+  formMsg: document.getElementById('formMsg'),
+  breakdown: document.getElementById('breakdown'),
+  ledgerList: document.getElementById('ledgerList'),
+};
+
+function fmtKES(n){
+  n = Number(n) || 0;
+  return 'KES ' + n.toLocaleString('en-US', {maximumFractionDigits:0});
+}
+function fmtDate(d){
+  if(!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+}
+function nightsBetween(a,b){
+  const ms = new Date(b) - new Date(a);
+  return Math.max(1, Math.round(ms / 86400000));
+}
+function thisMonthKey(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+function showConnBanner(msg){
+  const b = document.getElementById('connBanner');
+  b.style.display = 'block';
+  b.innerHTML = msg;
+}
+function hideConnBanner(){ document.getElementById('connBanner').style.display = 'none'; }
+
+function setFormEnabled(enabled){
+  els.form.querySelector('button[type="submit"]').disabled = !enabled;
+}
+
+/* ---------- row <-> app object mapping ---------- */
+function rowToBooking(row){
+  return {
+    id: row.id,
+    guestName: row.guest_name,
+    phone: row.phone,
+    idNumber: row.id_number,
+    checkIn: row.check_in,
+    checkOut: row.check_out,
+    numGuests: row.num_guests,
+    unit: row.unit,
+    agreed: Number(row.agreed),
+    paid: Number(row.paid),
+    method: row.method,
+    receivedBy: row.received_by,
+    notes: row.notes,
+  };
+}
+function bookingToRow(b){
+  return {
+    guest_name: b.guestName,
+    phone: b.phone,
+    id_number: b.idNumber || null,
+    check_in: b.checkIn,
+    check_out: b.checkOut,
+    num_guests: b.numGuests,
+    unit: b.unit || null,
+    agreed: b.agreed,
+    paid: b.paid,
+    method: b.method,
+    received_by: b.receivedBy,
+    notes: b.notes || null,
+  };
+}
+
+/* ---------- data operations ---------- */
+async function loadBookings(){
+  els.ledgerList.innerHTML = '<div class="loading">Loading the ledger…</div>';
+  try{
+    const { data, error } = await sb.from('bookings').select('*').order('check_in', { ascending:false });
+    if(error) throw error;
+    bookings = data.map(rowToBooking);
+    hideConnBanner();
+    setFormEnabled(true);
+  }catch(e){
+    console.error('Karibu Ledger load error:', e);
+    showConnBanner('Couldn\'t load the ledger &mdash; check your Supabase URL/key are correct, and that Row Level Security policies were created (see the setup SQL). <br><button id="retryLoadBtn" class="btn btn-ghost" style="margin-top:8px;">Retry</button>');
+    setFormEnabled(false);
+    loaded = true;
+    render();
+    const btn = document.getElementById('retryLoadBtn');
+    if(btn) btn.addEventListener('click', loadBookings);
+    return;
+  }
+  loaded = true;
+  render();
+}
+
+async function insertBooking(entry){
+  const { data, error } = await sb.from('bookings').insert([bookingToRow(entry)]).select();
+  if(error) throw error;
+  return rowToBooking(data[0]);
+}
+
+async function deleteBookingRemote(id){
+  const { error } = await sb.from('bookings').delete().eq('id', id);
+  if(error) throw error;
+}
+
+async function markPaidRemote(id, amount){
+  const { error } = await sb.from('bookings').update({ paid: amount }).eq('id', id);
+  if(error) throw error;
+}
+
+/* ---------- UI wiring ---------- */
+function switchTab(name){
+  els.tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  els.panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+}
+els.tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+function showMsg(text, type){
+  els.formMsg.innerHTML = `<div class="form-msg ${type}">${text}</div>`;
+  setTimeout(() => { els.formMsg.innerHTML = ''; }, 3500);
+}
+
+els.form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const checkIn = document.getElementById('checkIn').value;
+  const checkOut = document.getElementById('checkOut').value;
+  if(new Date(checkOut) <= new Date(checkIn)){
+    showMsg('Check-out date must be after check-in date.', 'error');
+    return;
+  }
+  const entry = {
+    guestName: document.getElementById('guestName').value.trim(),
+    phone: document.getElementById('phone').value.trim(),
+    idNumber: document.getElementById('idNumber').value.trim(),
+    checkIn, checkOut,
+    numGuests: Number(document.getElementById('numGuests').value) || 1,
+    unit: document.getElementById('unit').value.trim(),
+    agreed: Number(document.getElementById('agreed').value) || 0,
+    paid: Number(document.getElementById('paid').value) || 0,
+    method: document.getElementById('method').value,
+    receivedBy: document.getElementById('receivedBy').value,
+    notes: document.getElementById('notes').value.trim(),
+  };
+
+  const submitBtn = els.form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving…';
+
+  try{
+    const saved = await insertBooking(entry);
+    bookings.push(saved);
+    showMsg('Guest added to the ledger.', 'success');
+    els.form.reset();
+    document.getElementById('numGuests').value = 1;
+    render();
+    switchTab('ledger');
+  }catch(e){
+    console.error('Karibu Ledger save error:', e);
+    showMsg("Couldn't save — check your connection and try again.", 'error');
+  }
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Add to ledger';
+});
+
+async function deleteEntry(id){
+  if(!confirm('Remove this guest entry from the ledger? This cannot be undone.')) return;
+  try{
+    await deleteBookingRemote(id);
+    bookings = bookings.filter(b => b.id !== id);
+    render();
+  }catch(e){
+    console.error('Karibu Ledger delete error:', e);
+    alert("Couldn't delete — check your connection and try again.");
+  }
+}
+
+async function markPaid(id){
+  const b = bookings.find(x => x.id === id);
+  if(!b) return;
+  try{
+    await markPaidRemote(id, b.agreed);
+    b.paid = b.agreed;
+    render();
+  }catch(e){
+    console.error('Karibu Ledger update error:', e);
+    alert("Couldn't update — check your connection and try again.");
+  }
+}
+
+function render(){
+  renderStats();
+  renderBreakdown();
+  renderLedger();
+}
+
+function renderStats(){
+  const totalGuests = bookings.length;
+  const totalIncome = bookings.reduce((s,b) => s + b.paid, 0);
+  const totalDue = bookings.reduce((s,b) => s + Math.max(0, b.agreed - b.paid), 0);
+  const mKey = thisMonthKey();
+  const monthIncome = bookings.filter(b => b.checkIn && b.checkIn.slice(0,7) === mKey).reduce((s,b) => s + b.paid, 0);
+  els.stats.innerHTML = `
+    <div class="stat"><div class="label">Total Stays</div><div class="value">${totalGuests}</div></div>
+    <div class="stat"><div class="label">Collected So Far</div><div class="value">${fmtKES(totalIncome)}</div></div>
+    <div class="stat"><div class="label">This Month</div><div class="value">${fmtKES(monthIncome)}</div></div>
+    <div class="stat due"><div class="label">Outstanding</div><div class="value">${fmtKES(totalDue)}</div></div>
+  `;
+}
+
+function renderBreakdown(){
+  if(bookings.length === 0){ els.breakdown.innerHTML = ''; return; }
+  const byWho = {};
+  bookings.forEach(b => { byWho[b.receivedBy] = (byWho[b.receivedBy]||0) + b.paid; });
+  els.breakdown.innerHTML = Object.entries(byWho).map(([who, amt]) =>
+    `<div class="chip">Collected by ${escapeHtml(who)}: <b>${fmtKES(amt)}</b></div>`
+  ).join('');
+}
+
+function renderLedger(){
+  if(!loaded) return;
+  if(bookings.length === 0){
+    els.ledgerList.innerHTML = `<div class="empty"><div class="big">The ledger is empty</div>Add the first stay from the "Log a Guest" tab.</div>`;
+    return;
+  }
+  const sorted = [...bookings].sort((a,b) => new Date(b.checkIn) - new Date(a.checkIn));
+  els.ledgerList.innerHTML = sorted.map((b, i) => {
+    const balance = b.agreed - b.paid;
+    const isPaid = balance <= 0;
+    const num = String(sorted.length - i).padStart(3, '0');
+    return `
+      <div class="entry">
+        <div class="entry-top">
+          <div>
+            <div class="entry-num">Entry No. ${num}</div>
+            <div class="entry-name">${escapeHtml(b.guestName)}</div>
+            <div class="entry-dates">${fmtDate(b.checkIn)} → ${fmtDate(b.checkOut)} · ${nightsBetween(b.checkIn,b.checkOut)} night(s) · ${b.numGuests} guest(s)</div>
+          </div>
+          <div class="stamp ${isPaid ? 'paid' : 'due'}">${isPaid ? 'Paid' : 'Due'}</div>
+        </div>
+        <hr class="entry-divider">
+        <div class="entry-grid">
+          <div><span class="k">Phone</span><br><span class="v">${escapeHtml(b.phone)}</span></div>
+          <div><span class="k">Unit</span><br><span class="v">${escapeHtml(b.unit) || '—'}</span></div>
+          <div><span class="k">Agreed</span><br><span class="v">${fmtKES(b.agreed)}</span></div>
+          <div><span class="k">Paid</span><br><span class="v">${fmtKES(b.paid)}</span></div>
+          <div><span class="k">Balance</span><br><span class="v" style="${balance>0?'color:var(--due)':''}">${fmtKES(Math.max(0,balance))}</span></div>
+          <div><span class="k">Method / By</span><br><span class="v">${escapeHtml(b.method)} · ${escapeHtml(b.receivedBy)}</span></div>
+        </div>
+        ${b.notes ? `<div class="entry-notes">"${escapeHtml(b.notes)}"</div>` : ''}
+        <div class="entry-actions">
+          ${!isPaid ? `<button class="btn btn-paid" onclick="markPaid(${b.id})">Mark fully paid</button>` : ''}
+          <button class="btn btn-ghost" onclick="deleteEntry(${b.id})">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ---------- init ---------- */
+(function(){
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('checkIn').value = today;
+  document.getElementById('checkOut').value = today;
+
+  if(SUPABASE_URL === 'YOUR_SUPABASE_PROJECT_URL' || SUPABASE_KEY === 'YOUR_SUPABASE_PUBLISHABLE_KEY'){
+    const banner = document.getElementById('setupBanner');
+    banner.style.display = 'block';
+    banner.innerHTML = 'Setup needed: open this file, replace <code>SUPABASE_URL</code> and <code>SUPABASE_KEY</code> near the top of the &lt;script&gt; with your own project values, then reload.';
+    setFormEnabled(false);
+    els.ledgerList.innerHTML = '';
+    loaded = true;
+    render();
+    return;
+  }
+
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  loadBookings();
+})();
+</script>
+</body>
+</html>
