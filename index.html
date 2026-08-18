@@ -191,7 +191,7 @@
 
   <header class="top">
     <div class="eyebrow">Guest &amp; Income Tracker</div>
-       <h1>Karibu Ledger</h1>
+       <h1>Countryside Gateway Apartments-Nyeri</h1>
     <div class="subtitle">One place for every stay — no more relying on memory.</div>
   </header>
 
@@ -353,7 +353,7 @@ async function loadBookings(){
     hideConnBanner();
     setFormEnabled(true);
   }catch(e){
-    console.error('Karibu Ledger load error:', e);
+    console.error('Countryside Gateway Apartments-Nyeri load error:', e);
     showConnBanner('Couldn\'t load the ledger &mdash; check your Supabase URL/key are correct, and that Row Level Security policies were created (see the setup SQL). <br><button id="retryLoadBtn" class="btn btn-ghost" style="margin-top:8px;">Retry</button>');
     setFormEnabled(false);
     loaded = true;
@@ -429,7 +429,7 @@ els.form.addEventListener('submit', async (e) => {
     render();
     switchTab('ledger');
   }catch(e){
-    console.error('Karibu Ledger save error:', e);
+    console.error('Countryside Gateway Apartments-Nyeri save error:', e);
     showMsg("Couldn't save — check your connection and try again.", 'error');
   }
 
@@ -444,7 +444,7 @@ async function deleteEntry(id){
     bookings = bookings.filter(b => b.id !== id);
     render();
   }catch(e){
-    console.error('Karibu Ledger delete error:', e);
+    console.error('Countryside Gateway Apartments-Nyeri delete error:', e);
     alert("Couldn't delete — check your connection and try again.");
   }
 }
@@ -457,7 +457,7 @@ async function markPaid(id){
     b.paid = b.agreed;
     render();
   }catch(e){
-    console.error('Karibu Ledger update error:', e);
+    console.error('Countryside Gateway Apartments-Nyeri update error:', e);
     alert("Couldn't update — check your connection and try again.");
   }
 }
