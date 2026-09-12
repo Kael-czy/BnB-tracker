@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Countryside Gateway Apartments — Nyeri</title>
+<title>Countryside Gateway Apartments</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -180,6 +180,31 @@
   .conn-banner{ background:var(--due-bg); color:var(--due); border:1px solid var(--due); border-radius:10px; padding:12px 14px; font-size:13px; margin-bottom:16px; line-height:1.5; }
   .setup-banner{ background:#FFF7E6; color:#7A5A00; border:1px solid #E8C468; border-radius:10px; padding:14px; font-size:13px; margin-bottom:16px; line-height:1.6; }
   .setup-banner code{ background:#00000012; padding:1px 5px; border-radius:4px; }
+  .prop-switch{
+    display:flex;
+    background:var(--ink);
+    border-radius:999px;
+    padding:4px;
+    margin:18px 0 20px;
+    gap:4px;
+  }
+  .prop-btn{
+    flex:1;
+    text-align:center;
+    padding:11px 12px;
+    border-radius:999px;
+    font-weight:700;
+    font-size:14px;
+    font-family:'Fraunces',serif;
+    cursor:pointer;
+    color:var(--brass-light);
+    transition:background .15s ease, color .15s ease;
+    user-select:none;
+  }
+  .prop-btn.active{
+    background:var(--brass);
+    color:#fff;
+  }
   @media (max-width:380px){ .entry-grid{ grid-template-columns:1fr; } h1{ font-size:28px; } }
 select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A87C2B' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");background-repeat:no-repeat;background-position:right 14px center;background-size:13px;padding-right:38px;cursor:pointer;}select:hover{border-color:var(--brass-light);}</style>
 </head>
@@ -191,9 +216,14 @@ select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-i
 
   <header class="top">
     <div class="eyebrow">Guest &amp; Income Tracker</div>
-       <h1>Countryside Gateway Apartments-Nyeri</h1>
+       <h1>Countryside Gateway Apartments</h1>
     <div class="subtitle">One place for every stay — no more relying on memory.</div>
   </header>
+
+  <div class="prop-switch" id="propSwitch">
+    <div class="prop-btn active" data-property="Nyeri">Nyeri</div>
+    <div class="prop-btn" data-property="Kasarani">Kasarani</div>
+  </div>
 
   <div class="stats" id="stats"></div>
 
@@ -247,7 +277,7 @@ select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-i
     <div id="ledgerList"></div>
   </div>
 
- 
+
 
 </div>
 
@@ -263,6 +293,7 @@ const SUPABASE_KEY = 'sb_publishable_ExYjCKwNoVAFpHvR1Gt4tA_NtO58VzR'; // starts
 let sb = null;
 let bookings = [];
 let loaded = false;
+let currentProperty = 'Nyeri';
 
 const els = {
   stats: document.getElementById('stats'),
@@ -272,6 +303,7 @@ const els = {
   formMsg: document.getElementById('formMsg'),
   breakdown: document.getElementById('breakdown'),
   ledgerList: document.getElementById('ledgerList'), monthlyList: document.getElementById('monthlyList'), pcStats: document.getElementById('pcStats'), pettyCashList: document.getElementById('pettyCashList'),
+  propBtns: document.querySelectorAll('.prop-btn'),
 };
 
 function fmtKES(n){
@@ -308,6 +340,22 @@ function setFormEnabled(enabled){
   els.form.querySelector('button[type="submit"]').disabled = !enabled;
 }
 
+/* ---------- property switcher ---------- */
+function switchProperty(property){
+  if(property === currentProperty) return;
+  currentProperty = property;
+  els.propBtns.forEach(b => b.classList.toggle('active', b.dataset.property === property));
+  try{ window.localStorage.setItem('cga_property', property); }catch(e){}
+  loaded = false;
+  pcLoaded = false;
+  bookings = [];
+  pettyCash = [];
+  render();
+  loadBookings();
+  loadPettyCash();
+}
+els.propBtns.forEach(b => b.addEventListener('click', () => switchProperty(b.dataset.property)));
+
 /* ---------- row <-> app object mapping ---------- */
 function rowToBooking(row){
   return {
@@ -324,6 +372,7 @@ function rowToBooking(row){
     method: row.method,
     receivedBy: row.received_by,
     notes: row.notes,
+    property: row.property,
   };
 }
 function bookingToRow(b){
@@ -340,6 +389,7 @@ function bookingToRow(b){
     method: b.method,
     received_by: b.receivedBy,
     notes: b.notes || null,
+    property: b.property || currentProperty,
   };
 }
 
@@ -347,13 +397,13 @@ function bookingToRow(b){
 async function loadBookings(){
   els.ledgerList.innerHTML = '<div class="loading">Loading the ledger…</div>';
   try{
-    const { data, error } = await sb.from('bookings').select('*').order('check_in', { ascending:false });
+    const { data, error } = await sb.from('bookings').select('*').eq('property', currentProperty).order('check_in', { ascending:false });
     if(error) throw error;
     bookings = data.map(rowToBooking);
     hideConnBanner();
     setFormEnabled(true);
   }catch(e){
-    console.error('Countryside Gateway Apartments-Nyeri load error:', e);
+    console.error(`Countryside Gateway Apartments (${currentProperty}) load error:`, e);
     showConnBanner('Couldn\'t load the ledger &mdash; check your Supabase URL/key are correct, and that Row Level Security policies were created (see the setup SQL). <br><button id="retryLoadBtn" class="btn btn-ghost" style="margin-top:8px;">Retry</button>');
     setFormEnabled(false);
     loaded = true;
@@ -414,6 +464,7 @@ els.form.addEventListener('submit', async (e) => {
     method: document.getElementById('method').value,
     receivedBy: document.getElementById('receivedBy').value,
     notes: document.getElementById('notes').value.trim(),
+    property: currentProperty,
   };
 
   const submitBtn = els.form.querySelector('button[type="submit"]');
@@ -429,7 +480,7 @@ els.form.addEventListener('submit', async (e) => {
     render();
     switchTab('ledger');
   }catch(e){
-    console.error('Countryside Gateway Apartments-Nyeri save error:', e);
+    console.error(`Countryside Gateway Apartments (${currentProperty}) save error:`, e);
     showMsg("Couldn't save — check your connection and try again.", 'error');
   }
 
@@ -444,7 +495,7 @@ async function deleteEntry(id){
     bookings = bookings.filter(b => b.id !== id);
     render();
   }catch(e){
-    console.error('Countryside Gateway Apartments-Nyeri delete error:', e);
+    console.error(`Countryside Gateway Apartments (${currentProperty}) delete error:`, e);
     alert("Couldn't delete — check your connection and try again.");
   }
 }
@@ -457,7 +508,7 @@ async function markPaid(id){
     b.paid = b.agreed;
     render();
   }catch(e){
-    console.error('Countryside Gateway Apartments-Nyeri update error:', e);
+    console.error(`Countryside Gateway Apartments (${currentProperty}) update error:`, e);
     alert("Couldn't update — check your connection and try again.");
   }
 }
@@ -531,11 +582,19 @@ function renderLedger(){
   }).join('');
 }
 
-function fmtMonth(key){const p=key.split('-');const dt=new Date(Number(p[0]),Number(p[1])-1,1);return dt.toLocaleDateString('en-GB',{month:'long',year:'numeric'});}function renderMonthly(){if(!loaded)return;if(bookings.length===0){els.monthlyList.innerHTML='<div class="empty"><div class="big">No earnings yet</div>Monthly totals will appear here once you log a stay.</div>';return;}const byMonth={};bookings.forEach(b=>{if(!b.checkIn)return;const key=b.checkIn.slice(0,7);if(!byMonth[key])byMonth[key]={paid:0,agreed:0,stays:0};byMonth[key].paid+=b.paid;byMonth[key].agreed+=b.agreed;byMonth[key].stays+=1;});const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));els.monthlyList.innerHTML=months.map(key=>{const m=byMonth[key];const outstanding=Math.max(0,m.agreed-m.paid);return `<div class="entry"><div class="entry-top"><div><div class="entry-name">${fmtMonth(key)}</div><div class="entry-dates">${m.stays} stay${m.stays===1?'':'s'}</div></div><div class="stamp paid">${fmtKES(m.paid)}</div></div><hr class="entry-divider"><div class="entry-grid"><div><span class="k">Collected</span><br><span class="v">${fmtKES(m.paid)}</span></div><div><span class="k">Agreed total</span><br><span class="v">${fmtKES(m.agreed)}</span></div><div><span class="k">Outstanding</span><br><span class="v" style="${outstanding>0?'color:var(--due)':''}">${fmtKES(outstanding)}</span></div></div></div>`;}).join('');}let pettyCash=[];let pcLoaded=false;function rowToPetty(row){return {id:row.id,type:row.type,amount:Number(row.amount),description:row.description,date:row.date,by:row.spent_by,notes:row.notes};}function pettyToRow(p){return {type:p.type,amount:p.amount,description:p.description,date:p.date,spent_by:p.by,notes:p.notes||null};}function showPcBanner(msg){const b=document.getElementById('pcBanner');b.style.display='block';b.innerHTML=msg;}function hidePcBanner(){document.getElementById('pcBanner').style.display='none';}async function loadPettyCash(){try{const { data, error } = await sb.from('petty_cash').select('*').order('date', { ascending:false });if(error) throw error;pettyCash = data.map(rowToPetty);hidePcBanner();}catch(e){console.error('Countryside Gateway Apartments-Nyeri petty cash load error:', e);pettyCash = [];showPcBanner('Could not load petty cash — the <code>petty_cash</code> table may not exist yet in Supabase.');}pcLoaded = true;render();}async function insertPettyCash(entry){const { data, error } = await sb.from('petty_cash').insert([pettyToRow(entry)]).select();if(error) throw error;return rowToPetty(data[0]);}async function deletePettyCashRemote(id){const { error } = await sb.from('petty_cash').delete().eq('id', id);if(error) throw error;}document.getElementById('pettyCashForm').addEventListener('submit', async (e) => {e.preventDefault();const entry = {type: document.getElementById('pcType').value,amount: Number(document.getElementById('pcAmount').value) || 0,description: document.getElementById('pcDescription').value.trim(),date: document.getElementById('pcDate').value,by: document.getElementById('pcBy').value,notes: document.getElementById('pcNotes').value.trim(),};const submitBtn = e.target.querySelector('button[type="submit"]');submitBtn.disabled = true;submitBtn.textContent = 'Saving…';const msgEl = document.getElementById('pcFormMsg');try{const saved = await insertPettyCash(entry);pettyCash.push(saved);msgEl.innerHTML = '<div class="form-msg success">Entry added.</div>';setTimeout(() => { msgEl.innerHTML = ''; }, 3500);e.target.reset();document.getElementById('pcDate').value = new Date().toISOString().slice(0,10);render();}catch(err){console.error('Countryside Gateway Apartments-Nyeri petty cash save error:', err);msgEl.innerHTML = '<div class="form-msg error">Could not save — check your connection and try again.</div>';setTimeout(() => { msgEl.innerHTML = ''; }, 3500);}submitBtn.disabled = false;submitBtn.textContent = 'Add entry';});async function deletePettyCash(id){if(!confirm('Remove this petty cash entry? This cannot be undone.')) return;try{await deletePettyCashRemote(id);pettyCash = pettyCash.filter(x => x.id !== id);render();}catch(e){console.error('Countryside Gateway Apartments-Nyeri petty cash delete error:', e);alert("Could not delete — check your connection and try again.");}}function renderPettyCash(){if(!pcLoaded) return;if(pettyCash.length === 0){els.pcStats.innerHTML = '';els.pettyCashList.innerHTML = `<div class="empty"><div class="big">No petty cash entries yet</div>Log a float top-up or an expense to get started.</div>`;return;}const chronological = [...pettyCash].sort((a,b) => new Date(a.date) - new Date(b.date) || a.id - b.id);let running = 0;const withBalance = chronological.map(e => {running += e.type === 'topup' ? e.amount : -e.amount;return Object.assign({}, e, { balanceAfter: running });});const totalTopup = pettyCash.filter(e => e.type === 'topup').reduce((s,e) => s + e.amount, 0);const totalSpent = pettyCash.filter(e => e.type === 'expense').reduce((s,e) => s + e.amount, 0);const balance = totalTopup - totalSpent;const mKey = thisMonthKey();const monthSpent = pettyCash.filter(e => e.type === 'expense' && e.date && e.date.slice(0,7) === mKey).reduce((s,e) => s + e.amount, 0);els.pcStats.innerHTML = `<div class="stat ${balance < 0 ? 'due' : ''}"><div class="label">Current Balance</div><div class="value">${fmtKES(balance)}</div></div><div class="stat"><div class="label">Total Float Added</div><div class="value">${fmtKES(totalTopup)}</div></div><div class="stat"><div class="label">Total Spent</div><div class="value">${fmtKES(totalSpent)}</div></div><div class="stat due"><div class="label">Spent This Month</div><div class="value">${fmtKES(monthSpent)}</div></div>`;const displayOrder = [...withBalance].reverse();els.pettyCashList.innerHTML = displayOrder.map(e => {const isTopup = e.type === 'topup';return `<div class="entry"><div class="entry-top"><div><div class="entry-name">${escapeHtml(e.description)}</div><div class="entry-dates">${fmtDate(e.date)} · ${isTopup ? 'Float top-up' : 'Expense'} · ${escapeHtml(e.by || '—')}</div></div><div class="stamp ${isTopup ? 'paid' : 'due'}">${isTopup ? '+' : '-'}${fmtKES(e.amount)}</div></div><hr class="entry-divider"><div class="entry-grid"><div><span class="k">Amount</span><br><span class="v">${fmtKES(e.amount)}</span></div><div><span class="k">Balance after</span><br><span class="v">${fmtKES(e.balanceAfter)}</span></div></div>${e.notes ? `<div class="entry-notes">"${escapeHtml(e.notes)}"</div>` : ''}<div class="entry-actions"><button class="btn btn-ghost" onclick="deletePettyCash(${e.id})">Delete</button></div></div>`;}).join('');}/* ---------- init ---------- */
+function fmtMonth(key){const p=key.split('-');const dt=new Date(Number(p[0]),Number(p[1])-1,1);return dt.toLocaleDateString('en-GB',{month:'long',year:'numeric'});}function renderMonthly(){if(!loaded)return;if(bookings.length===0){els.monthlyList.innerHTML='<div class="empty"><div class="big">No earnings yet</div>Monthly totals will appear here once you log a stay.</div>';return;}const byMonth={};bookings.forEach(b=>{if(!b.checkIn)return;const key=b.checkIn.slice(0,7);if(!byMonth[key])byMonth[key]={paid:0,agreed:0,stays:0};byMonth[key].paid+=b.paid;byMonth[key].agreed+=b.agreed;byMonth[key].stays+=1;});const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));els.monthlyList.innerHTML=months.map(key=>{const m=byMonth[key];const outstanding=Math.max(0,m.agreed-m.paid);return `<div class="entry"><div class="entry-top"><div><div class="entry-name">${fmtMonth(key)}</div><div class="entry-dates">${m.stays} stay${m.stays===1?'':'s'}</div></div><div class="stamp paid">${fmtKES(m.paid)}</div></div><hr class="entry-divider"><div class="entry-grid"><div><span class="k">Collected</span><br><span class="v">${fmtKES(m.paid)}</span></div><div><span class="k">Agreed total</span><br><span class="v">${fmtKES(m.agreed)}</span></div><div><span class="k">Outstanding</span><br><span class="v" style="${outstanding>0?'color:var(--due)':''}">${fmtKES(outstanding)}</span></div></div></div>`;}).join('');}let pettyCash=[];let pcLoaded=false;function rowToPetty(row){return {id:row.id,type:row.type,amount:Number(row.amount),description:row.description,date:row.date,by:row.spent_by,notes:row.notes,property:row.property};}function pettyToRow(p){return {type:p.type,amount:p.amount,description:p.description,date:p.date,spent_by:p.by,notes:p.notes||null,property:p.property||currentProperty};}function showPcBanner(msg){const b=document.getElementById('pcBanner');b.style.display='block';b.innerHTML=msg;}function hidePcBanner(){document.getElementById('pcBanner').style.display='none';}async function loadPettyCash(){try{const { data, error } = await sb.from('petty_cash').select('*').eq('property', currentProperty).order('date', { ascending:false });if(error) throw error;pettyCash = data.map(rowToPetty);hidePcBanner();}catch(e){console.error(`Countryside Gateway Apartments (${currentProperty}) petty cash load error:`, e);pettyCash = [];showPcBanner('Could not load petty cash — the <code>petty_cash</code> table may not exist yet in Supabase.');}pcLoaded = true;render();}async function insertPettyCash(entry){const { data, error } = await sb.from('petty_cash').insert([pettyToRow(entry)]).select();if(error) throw error;return rowToPetty(data[0]);}async function deletePettyCashRemote(id){const { error } = await sb.from('petty_cash').delete().eq('id', id);if(error) throw error;}document.getElementById('pettyCashForm').addEventListener('submit', async (e) => {e.preventDefault();const entry = {type: document.getElementById('pcType').value,amount: Number(document.getElementById('pcAmount').value) || 0,description: document.getElementById('pcDescription').value.trim(),date: document.getElementById('pcDate').value,by: document.getElementById('pcBy').value,notes: document.getElementById('pcNotes').value.trim(),property: currentProperty,};const submitBtn = e.target.querySelector('button[type="submit"]');submitBtn.disabled = true;submitBtn.textContent = 'Saving…';const msgEl = document.getElementById('pcFormMsg');try{const saved = await insertPettyCash(entry);pettyCash.push(saved);msgEl.innerHTML = '<div class="form-msg success">Entry added.</div>';setTimeout(() => { msgEl.innerHTML = ''; }, 3500);e.target.reset();document.getElementById('pcDate').value = new Date().toISOString().slice(0,10);render();}catch(err){console.error(`Countryside Gateway Apartments (${currentProperty}) petty cash save error:`, err);msgEl.innerHTML = '<div class="form-msg error">Could not save — check your connection and try again.</div>';setTimeout(() => { msgEl.innerHTML = ''; }, 3500);}submitBtn.disabled = false;submitBtn.textContent = 'Add entry';});async function deletePettyCash(id){if(!confirm('Remove this petty cash entry? This cannot be undone.')) return;try{await deletePettyCashRemote(id);pettyCash = pettyCash.filter(x => x.id !== id);render();}catch(e){console.error(`Countryside Gateway Apartments (${currentProperty}) petty cash delete error:`, e);alert("Could not delete — check your connection and try again.");}}function renderPettyCash(){if(!pcLoaded) return;if(pettyCash.length === 0){els.pcStats.innerHTML = '';els.pettyCashList.innerHTML = `<div class="empty"><div class="big">No petty cash entries yet</div>Log a float top-up or an expense to get started.</div>`;return;}const chronological = [...pettyCash].sort((a,b) => new Date(a.date) - new Date(b.date) || a.id - b.id);let running = 0;const withBalance = chronological.map(e => {running += e.type === 'topup' ? e.amount : -e.amount;return Object.assign({}, e, { balanceAfter: running });});const totalTopup = pettyCash.filter(e => e.type === 'topup').reduce((s,e) => s + e.amount, 0);const totalSpent = pettyCash.filter(e => e.type === 'expense').reduce((s,e) => s + e.amount, 0);const balance = totalTopup - totalSpent;const mKey = thisMonthKey();const monthSpent = pettyCash.filter(e => e.type === 'expense' && e.date && e.date.slice(0,7) === mKey).reduce((s,e) => s + e.amount, 0);els.pcStats.innerHTML = `<div class="stat ${balance < 0 ? 'due' : ''}"><div class="label">Current Balance</div><div class="value">${fmtKES(balance)}</div></div><div class="stat"><div class="label">Total Float Added</div><div class="value">${fmtKES(totalTopup)}</div></div><div class="stat"><div class="label">Total Spent</div><div class="value">${fmtKES(totalSpent)}</div></div><div class="stat due"><div class="label">Spent This Month</div><div class="value">${fmtKES(monthSpent)}</div></div>`;const displayOrder = [...withBalance].reverse();els.pettyCashList.innerHTML = displayOrder.map(e => {const isTopup = e.type === 'topup';return `<div class="entry"><div class="entry-top"><div><div class="entry-name">${escapeHtml(e.description)}</div><div class="entry-dates">${fmtDate(e.date)} · ${isTopup ? 'Float top-up' : 'Expense'} · ${escapeHtml(e.by || '—')}</div></div><div class="stamp ${isTopup ? 'paid' : 'due'}">${isTopup ? '+' : '-'}${fmtKES(e.amount)}</div></div><hr class="entry-divider"><div class="entry-grid"><div><span class="k">Amount</span><br><span class="v">${fmtKES(e.amount)}</span></div><div><span class="k">Balance after</span><br><span class="v">${fmtKES(e.balanceAfter)}</span></div></div>${e.notes ? `<div class="entry-notes">"${escapeHtml(e.notes)}"</div>` : ''}<div class="entry-actions"><button class="btn btn-ghost" onclick="deletePettyCash(${e.id})">Delete</button></div></div>`;}).join('');}/* ---------- init ---------- */
 (function(){
   const today = new Date().toISOString().slice(0,10);
   document.getElementById('checkIn').value = today;
   document.getElementById('checkOut').value = today;document.getElementById('pcDate').value = today;
+
+  try{
+    const savedProperty = window.localStorage.getItem('cga_property');
+    if(savedProperty === 'Nyeri' || savedProperty === 'Kasarani'){
+      currentProperty = savedProperty;
+      els.propBtns.forEach(b => b.classList.toggle('active', b.dataset.property === currentProperty));
+    }
+  }catch(e){}
 
   if(SUPABASE_URL === 'YOUR_SUPABASE_PROJECT_URL' || SUPABASE_KEY === 'YOUR_SUPABASE_PUBLISHABLE_KEY'){
     const banner = document.getElementById('setupBanner');
