@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.min.js"></script>
 <style>
   :root{
     --ink:#1C2B39;
@@ -205,7 +206,72 @@
     background:var(--brass);
     color:#fff;
   }
-  @media (max-width:380px){ .entry-grid{ grid-template-columns:1fr; } h1{ font-size:28px; } }
+  .trend-toggle{
+    display:flex;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:3px;
+    margin-bottom:16px;
+    max-width:240px;
+  }
+  .trend-toggle-btn{
+    flex:1;
+    text-align:center;
+    padding:7px 10px;
+    border-radius:999px;
+    font-weight:600;
+    font-size:12.5px;
+    cursor:pointer;
+    color:var(--muted);
+    user-select:none;
+    transition:background .15s ease, color .15s ease;
+  }
+  .trend-toggle-btn.active{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  .trend-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+    gap:10px;
+  }
+  .trend-nav-btn{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    width:34px;
+    height:34px;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    font-size:18px;
+    line-height:1;
+    color:var(--ink-soft);
+    user-select:none;
+  }
+  .trend-nav-btn:hover{ border-color:var(--brass-light); }
+  .trend-period-label{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:17px;
+    color:var(--ink);
+    text-align:center;
+    flex:1;
+  }
+  .trend-chart-wrap{
+    position:relative;
+    height:230px;
+    margin-bottom:6px;
+    touch-action:pan-y;
+  }
+  .trend-summary-title{ margin-bottom:4px; }
+  .trend-summary-narrative{ margin-bottom:14px; }
+  @media (max-width:380px){ .entry-grid{ grid-template-columns:1fr; } h1{ font-size:28px; } .trend-chart-wrap{ height:190px; } .trend-period-label{ font-size:15px; } }
 select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A87C2B' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");background-repeat:no-repeat;background-position:right 14px center;background-size:13px;padding-right:38px;cursor:pointer;}select:hover{border-color:var(--brass-light);}</style>
 </head>
 <body>
@@ -229,7 +295,7 @@ select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-i
 
   <div class="tabs">
     <div class="tab active" data-tab="log">Log a Guest</div>
-    <div class="tab" data-tab="ledger">The Ledger</div><div class="tab" data-tab="earnings">Earnings</div><div class="tab" data-tab="pettycash">Petty Cash</div>
+    <div class="tab" data-tab="ledger">The Ledger</div><div class="tab" data-tab="earnings">Earnings</div><div class="tab" data-tab="pettycash">Petty Cash</div><div class="tab" data-tab="trends">Trends</div>
   </div>
 
   <div class="panel active" id="panel-log">
@@ -272,7 +338,23 @@ select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-i
     </div>
   </div>
 
-  <div class="panel" id="panel-pettycash"><div id="pcBanner" class="conn-banner" style="display:none;"></div><div class="stats" id="pcStats"></div><div class="card"><div id="pcFormMsg"></div><form id="pettyCashForm"><div class="field"><label>Entry type</label><select id="pcType"><option value="expense">Expense</option><option value="topup">Float top-up</option></select></div><div class="row2"><div class="field"><label>Amount (KES)</label><input type="number" id="pcAmount" min="0" step="1" required placeholder="0"></div><div class="field"><label>Date</label><input type="date" id="pcDate" required></div></div><div class="field"><label>Description / Where used</label><input type="text" id="pcDescription" required placeholder="e.g. Cleaning supplies"></div><div class="field"><label>Spent / added by</label><select id="pcBy"><option>Sitter</option><option>Tamina</option><option>Kael</option><option>Ben</option></select></div><div class="field"><label>Notes (optional)</label><textarea id="pcNotes" placeholder="Anything worth remembering"></textarea></div><button type="submit" class="btn btn-primary">Add entry</button></form></div><div id="pettyCashList" style="margin-top:18px;"></div></div><div class="panel" id="panel-earnings"><div id="monthlyList"></div></div><div class="panel" id="panel-ledger">
+  <div class="panel" id="panel-pettycash"><div id="pcBanner" class="conn-banner" style="display:none;"></div><div class="stats" id="pcStats"></div><div class="card"><div id="pcFormMsg"></div><form id="pettyCashForm"><div class="field"><label>Entry type</label><select id="pcType"><option value="expense">Expense</option><option value="topup">Float top-up</option></select></div><div class="row2"><div class="field"><label>Amount (KES)</label><input type="number" id="pcAmount" min="0" step="1" required placeholder="0"></div><div class="field"><label>Date</label><input type="date" id="pcDate" required></div></div><div class="field"><label>Description / Where used</label><input type="text" id="pcDescription" required placeholder="e.g. Cleaning supplies"></div><div class="field"><label>Spent / added by</label><select id="pcBy"><option>Sitter</option><option>Tamina</option><option>Kael</option><option>Ben</option></select></div><div class="field"><label>Notes (optional)</label><textarea id="pcNotes" placeholder="Anything worth remembering"></textarea></div><button type="submit" class="btn btn-primary">Add entry</button></form></div><div id="pettyCashList" style="margin-top:18px;"></div></div><div class="panel" id="panel-trends">
+    <div class="card">
+      <div class="trend-toggle" id="trendToggle">
+        <div class="trend-toggle-btn active" data-view="monthly">Monthly</div>
+        <div class="trend-toggle-btn" data-view="annual">Annual</div>
+      </div>
+      <div class="trend-nav">
+        <div class="trend-nav-btn" id="trendPrevBtn" role="button" aria-label="Previous period">‹</div>
+        <div class="trend-period-label" id="trendPeriodLabel"></div>
+        <div class="trend-nav-btn" id="trendNextBtn" role="button" aria-label="Next period">›</div>
+      </div>
+      <div class="trend-chart-wrap" id="trendChartWrap">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+    <div class="card" id="trendSummary" style="margin-top:14px;"></div>
+  </div><div class="panel" id="panel-earnings"><div id="monthlyList"></div></div><div class="panel" id="panel-ledger">
     <div class="breakdown" id="breakdown"></div>
     <div id="ledgerList"></div>
   </div>
@@ -304,6 +386,13 @@ const els = {
   breakdown: document.getElementById('breakdown'),
   ledgerList: document.getElementById('ledgerList'), monthlyList: document.getElementById('monthlyList'), pcStats: document.getElementById('pcStats'), pettyCashList: document.getElementById('pettyCashList'),
   propBtns: document.querySelectorAll('.prop-btn'),
+  trendToggleBtns: document.querySelectorAll('.trend-toggle-btn'),
+  trendPrevBtn: document.getElementById('trendPrevBtn'),
+  trendNextBtn: document.getElementById('trendNextBtn'),
+  trendPeriodLabel: document.getElementById('trendPeriodLabel'),
+  trendChartWrap: document.getElementById('trendChartWrap'),
+  trendChartCanvas: document.getElementById('trendChart'),
+  trendSummary: document.getElementById('trendSummary'),
 };
 
 function fmtKES(n){
@@ -373,6 +462,7 @@ function rowToBooking(row){
     receivedBy: row.received_by,
     notes: row.notes,
     property: row.property,
+    createdAt: row.created_at,
   };
 }
 function bookingToRow(b){
@@ -436,6 +526,11 @@ async function markPaidRemote(id, amount){
 function switchTab(name){
   els.tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   els.panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  if(name === 'trends') renderTrends();
+}
+function isTrendsActive(){
+  const activeTab = document.querySelector('.tab.active');
+  return !!activeTab && activeTab.dataset.tab === 'trends';
 }
 els.tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
@@ -517,6 +612,7 @@ function render(){
   renderStats();
   renderBreakdown();
   renderLedger();renderMonthly();renderPettyCash();
+  if(isTrendsActive()) renderTrends();
 }
 
 function renderStats(){
@@ -582,7 +678,218 @@ function renderLedger(){
   }).join('');
 }
 
-function fmtMonth(key){const p=key.split('-');const dt=new Date(Number(p[0]),Number(p[1])-1,1);return dt.toLocaleDateString('en-GB',{month:'long',year:'numeric'});}function renderMonthly(){if(!loaded)return;if(bookings.length===0){els.monthlyList.innerHTML='<div class="empty"><div class="big">No earnings yet</div>Monthly totals will appear here once you log a stay.</div>';return;}const byMonth={};bookings.forEach(b=>{if(!b.checkIn)return;const key=b.checkIn.slice(0,7);if(!byMonth[key])byMonth[key]={paid:0,agreed:0,stays:0};byMonth[key].paid+=b.paid;byMonth[key].agreed+=b.agreed;byMonth[key].stays+=1;});const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));els.monthlyList.innerHTML=months.map(key=>{const m=byMonth[key];const outstanding=Math.max(0,m.agreed-m.paid);return `<div class="entry"><div class="entry-top"><div><div class="entry-name">${fmtMonth(key)}</div><div class="entry-dates">${m.stays} stay${m.stays===1?'':'s'}</div></div><div class="stamp paid">${fmtKES(m.paid)}</div></div><hr class="entry-divider"><div class="entry-grid"><div><span class="k">Collected</span><br><span class="v">${fmtKES(m.paid)}</span></div><div><span class="k">Agreed total</span><br><span class="v">${fmtKES(m.agreed)}</span></div><div><span class="k">Outstanding</span><br><span class="v" style="${outstanding>0?'color:var(--due)':''}">${fmtKES(outstanding)}</span></div></div></div>`;}).join('');}let pettyCash=[];let pcLoaded=false;function rowToPetty(row){return {id:row.id,type:row.type,amount:Number(row.amount),description:row.description,date:row.date,by:row.spent_by,notes:row.notes,property:row.property};}function pettyToRow(p){return {type:p.type,amount:p.amount,description:p.description,date:p.date,spent_by:p.by,notes:p.notes||null,property:p.property||currentProperty};}function showPcBanner(msg){const b=document.getElementById('pcBanner');b.style.display='block';b.innerHTML=msg;}function hidePcBanner(){document.getElementById('pcBanner').style.display='none';}async function loadPettyCash(){try{const { data, error } = await sb.from('petty_cash').select('*').eq('property', currentProperty).order('date', { ascending:false });if(error) throw error;pettyCash = data.map(rowToPetty);hidePcBanner();}catch(e){console.error(`Countryside Gateway Apartments (${currentProperty}) petty cash load error:`, e);pettyCash = [];showPcBanner('Could not load petty cash — the <code>petty_cash</code> table may not exist yet in Supabase.');}pcLoaded = true;render();}async function insertPettyCash(entry){const { data, error } = await sb.from('petty_cash').insert([pettyToRow(entry)]).select();if(error) throw error;return rowToPetty(data[0]);}async function deletePettyCashRemote(id){const { error } = await sb.from('petty_cash').delete().eq('id', id);if(error) throw error;}document.getElementById('pettyCashForm').addEventListener('submit', async (e) => {e.preventDefault();const entry = {type: document.getElementById('pcType').value,amount: Number(document.getElementById('pcAmount').value) || 0,description: document.getElementById('pcDescription').value.trim(),date: document.getElementById('pcDate').value,by: document.getElementById('pcBy').value,notes: document.getElementById('pcNotes').value.trim(),property: currentProperty,};const submitBtn = e.target.querySelector('button[type="submit"]');submitBtn.disabled = true;submitBtn.textContent = 'Saving…';const msgEl = document.getElementById('pcFormMsg');try{const saved = await insertPettyCash(entry);pettyCash.push(saved);msgEl.innerHTML = '<div class="form-msg success">Entry added.</div>';setTimeout(() => { msgEl.innerHTML = ''; }, 3500);e.target.reset();document.getElementById('pcDate').value = new Date().toISOString().slice(0,10);render();}catch(err){console.error(`Countryside Gateway Apartments (${currentProperty}) petty cash save error:`, err);msgEl.innerHTML = '<div class="form-msg error">Could not save — check your connection and try again.</div>';setTimeout(() => { msgEl.innerHTML = ''; }, 3500);}submitBtn.disabled = false;submitBtn.textContent = 'Add entry';});async function deletePettyCash(id){if(!confirm('Remove this petty cash entry? This cannot be undone.')) return;try{await deletePettyCashRemote(id);pettyCash = pettyCash.filter(x => x.id !== id);render();}catch(e){console.error(`Countryside Gateway Apartments (${currentProperty}) petty cash delete error:`, e);alert("Could not delete — check your connection and try again.");}}function renderPettyCash(){if(!pcLoaded) return;if(pettyCash.length === 0){els.pcStats.innerHTML = '';els.pettyCashList.innerHTML = `<div class="empty"><div class="big">No petty cash entries yet</div>Log a float top-up or an expense to get started.</div>`;return;}const chronological = [...pettyCash].sort((a,b) => new Date(a.date) - new Date(b.date) || a.id - b.id);let running = 0;const withBalance = chronological.map(e => {running += e.type === 'topup' ? e.amount : -e.amount;return Object.assign({}, e, { balanceAfter: running });});const totalTopup = pettyCash.filter(e => e.type === 'topup').reduce((s,e) => s + e.amount, 0);const totalSpent = pettyCash.filter(e => e.type === 'expense').reduce((s,e) => s + e.amount, 0);const balance = totalTopup - totalSpent;const mKey = thisMonthKey();const monthSpent = pettyCash.filter(e => e.type === 'expense' && e.date && e.date.slice(0,7) === mKey).reduce((s,e) => s + e.amount, 0);els.pcStats.innerHTML = `<div class="stat ${balance < 0 ? 'due' : ''}"><div class="label">Current Balance</div><div class="value">${fmtKES(balance)}</div></div><div class="stat"><div class="label">Total Float Added</div><div class="value">${fmtKES(totalTopup)}</div></div><div class="stat"><div class="label">Total Spent</div><div class="value">${fmtKES(totalSpent)}</div></div><div class="stat due"><div class="label">Spent This Month</div><div class="value">${fmtKES(monthSpent)}</div></div>`;const displayOrder = [...withBalance].reverse();els.pettyCashList.innerHTML = displayOrder.map(e => {const isTopup = e.type === 'topup';return `<div class="entry"><div class="entry-top"><div><div class="entry-name">${escapeHtml(e.description)}</div><div class="entry-dates">${fmtDate(e.date)} · ${isTopup ? 'Float top-up' : 'Expense'} · ${escapeHtml(e.by || '—')}</div></div><div class="stamp ${isTopup ? 'paid' : 'due'}">${isTopup ? '+' : '-'}${fmtKES(e.amount)}</div></div><hr class="entry-divider"><div class="entry-grid"><div><span class="k">Amount</span><br><span class="v">${fmtKES(e.amount)}</span></div><div><span class="k">Balance after</span><br><span class="v">${fmtKES(e.balanceAfter)}</span></div></div>${e.notes ? `<div class="entry-notes">"${escapeHtml(e.notes)}"</div>` : ''}<div class="entry-actions"><button class="btn btn-ghost" onclick="deletePettyCash(${e.id})">Delete</button></div></div>`;}).join('');}/* ---------- init ---------- */
+function fmtMonth(key){const p=key.split('-');const dt=new Date(Number(p[0]),Number(p[1])-1,1);return dt.toLocaleDateString('en-GB',{month:'long',year:'numeric'});}function renderMonthly(){if(!loaded)return;if(bookings.length===0){els.monthlyList.innerHTML='<div class="empty"><div class="big">No earnings yet</div>Monthly totals will appear here once you log a stay.</div>';return;}const byMonth={};bookings.forEach(b=>{if(!b.checkIn)return;const key=b.checkIn.slice(0,7);if(!byMonth[key])byMonth[key]={paid:0,agreed:0,stays:0};byMonth[key].paid+=b.paid;byMonth[key].agreed+=b.agreed;byMonth[key].stays+=1;});const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));els.monthlyList.innerHTML=months.map(key=>{const m=byMonth[key];const outstanding=Math.max(0,m.agreed-m.paid);return `<div class="entry"><div class="entry-top"><div><div class="entry-name">${fmtMonth(key)}</div><div class="entry-dates">${m.stays} stay${m.stays===1?'':'s'}</div></div><div class="stamp paid">${fmtKES(m.paid)}</div></div><hr class="entry-divider"><div class="entry-grid"><div><span class="k">Collected</span><br><span class="v">${fmtKES(m.paid)}</span></div><div><span class="k">Agreed total</span><br><span class="v">${fmtKES(m.agreed)}</span></div><div><span class="k">Outstanding</span><br><span class="v" style="${outstanding>0?'color:var(--due)':''}">${fmtKES(outstanding)}</span></div></div></div>`;}).join('');}let pettyCash=[];let pcLoaded=false;function rowToPetty(row){return {id:row.id,type:row.type,amount:Number(row.amount),description:row.description,date:row.date,by:row.spent_by,notes:row.notes,property:row.property};}function pettyToRow(p){return {type:p.type,amount:p.amount,description:p.description,date:p.date,spent_by:p.by,notes:p.notes||null,property:p.property||currentProperty};}function showPcBanner(msg){const b=document.getElementById('pcBanner');b.style.display='block';b.innerHTML=msg;}function hidePcBanner(){document.getElementById('pcBanner').style.display='none';}async function loadPettyCash(){try{const { data, error } = await sb.from('petty_cash').select('*').eq('property', currentProperty).order('date', { ascending:false });if(error) throw error;pettyCash = data.map(rowToPetty);hidePcBanner();}catch(e){console.error(`Countryside Gateway Apartments (${currentProperty}) petty cash load error:`, e);pettyCash = [];showPcBanner('Could not load petty cash — the <code>petty_cash</code> table may not exist yet in Supabase.');}pcLoaded = true;render();}async function insertPettyCash(entry){const { data, error } = await sb.from('petty_cash').insert([pettyToRow(entry)]).select();if(error) throw error;return rowToPetty(data[0]);}async function deletePettyCashRemote(id){const { error } = await sb.from('petty_cash').delete().eq('id', id);if(error) throw error;}document.getElementById('pettyCashForm').addEventListener('submit', async (e) => {e.preventDefault();const entry = {type: document.getElementById('pcType').value,amount: Number(document.getElementById('pcAmount').value) || 0,description: document.getElementById('pcDescription').value.trim(),date: document.getElementById('pcDate').value,by: document.getElementById('pcBy').value,notes: document.getElementById('pcNotes').value.trim(),property: currentProperty,};const submitBtn = e.target.querySelector('button[type="submit"]');submitBtn.disabled = true;submitBtn.textContent = 'Saving…';const msgEl = document.getElementById('pcFormMsg');try{const saved = await insertPettyCash(entry);pettyCash.push(saved);msgEl.innerHTML = '<div class="form-msg success">Entry added.</div>';setTimeout(() => { msgEl.innerHTML = ''; }, 3500);e.target.reset();document.getElementById('pcDate').value = new Date().toISOString().slice(0,10);render();}catch(err){console.error(`Countryside Gateway Apartments (${currentProperty}) petty cash save error:`, err);msgEl.innerHTML = '<div class="form-msg error">Could not save — check your connection and try again.</div>';setTimeout(() => { msgEl.innerHTML = ''; }, 3500);}submitBtn.disabled = false;submitBtn.textContent = 'Add entry';});async function deletePettyCash(id){if(!confirm('Remove this petty cash entry? This cannot be undone.')) return;try{await deletePettyCashRemote(id);pettyCash = pettyCash.filter(x => x.id !== id);render();}catch(e){console.error(`Countryside Gateway Apartments (${currentProperty}) petty cash delete error:`, e);alert("Could not delete — check your connection and try again.");}}function renderPettyCash(){if(!pcLoaded) return;if(pettyCash.length === 0){els.pcStats.innerHTML = '';els.pettyCashList.innerHTML = `<div class="empty"><div class="big">No petty cash entries yet</div>Log a float top-up or an expense to get started.</div>`;return;}const chronological = [...pettyCash].sort((a,b) => new Date(a.date) - new Date(b.date) || a.id - b.id);let running = 0;const withBalance = chronological.map(e => {running += e.type === 'topup' ? e.amount : -e.amount;return Object.assign({}, e, { balanceAfter: running });});const totalTopup = pettyCash.filter(e => e.type === 'topup').reduce((s,e) => s + e.amount, 0);const totalSpent = pettyCash.filter(e => e.type === 'expense').reduce((s,e) => s + e.amount, 0);const balance = totalTopup - totalSpent;const mKey = thisMonthKey();const monthSpent = pettyCash.filter(e => e.type === 'expense' && e.date && e.date.slice(0,7) === mKey).reduce((s,e) => s + e.amount, 0);els.pcStats.innerHTML = `<div class="stat ${balance < 0 ? 'due' : ''}"><div class="label">Current Balance</div><div class="value">${fmtKES(balance)}</div></div><div class="stat"><div class="label">Total Float Added</div><div class="value">${fmtKES(totalTopup)}</div></div><div class="stat"><div class="label">Total Spent</div><div class="value">${fmtKES(totalSpent)}</div></div><div class="stat due"><div class="label">Spent This Month</div><div class="value">${fmtKES(monthSpent)}</div></div>`;const displayOrder = [...withBalance].reverse();els.pettyCashList.innerHTML = displayOrder.map(e => {const isTopup = e.type === 'topup';return `<div class="entry"><div class="entry-top"><div><div class="entry-name">${escapeHtml(e.description)}</div><div class="entry-dates">${fmtDate(e.date)} · ${isTopup ? 'Float top-up' : 'Expense'} · ${escapeHtml(e.by || '—')}</div></div><div class="stamp ${isTopup ? 'paid' : 'due'}">${isTopup ? '+' : '-'}${fmtKES(e.amount)}</div></div><hr class="entry-divider"><div class="entry-grid"><div><span class="k">Amount</span><br><span class="v">${fmtKES(e.amount)}</span></div><div><span class="k">Balance after</span><br><span class="v">${fmtKES(e.balanceAfter)}</span></div></div>${e.notes ? `<div class="entry-notes">"${escapeHtml(e.notes)}"</div>` : ''}<div class="entry-actions"><button class="btn btn-ghost" onclick="deletePettyCash(${e.id})">Delete</button></div></div>`;}).join('');}/* ---------- trends (earnings graph) ---------- */
+const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const LONG_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+let trendViewMode = 'monthly';
+let trendMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let trendYear = new Date().getFullYear();
+let trendChartInstance = null;
+
+function pad2(n){ return String(n).padStart(2, '0'); }
+function dateStrFromParts(y, m, d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; }
+
+/* Money-received date: we bucket by created_at (when the entry was logged into
+   the system), not check_in/check_out. Reasoning: bookings only carry a single
+   running "paid" total rather than a per-payment transaction log, so there is
+   no exact timestamp for partial payments. created_at is the closest available
+   proxy for "when this revenue was recorded" — check_in reflects when a guest
+   stays, which can be booked or settled well before or after money changes
+   hands. If a booking's paid amount is edited later (e.g. "Mark fully paid"),
+   the updated total is still attributed to the original created_at day, since
+   the schema doesn't track an update timestamp either. */
+function bucketsForMonth(list, year, monthIdx){
+  const days = new Date(year, monthIdx + 1, 0).getDate();
+  const totals = new Array(days).fill(0);
+  const counts = new Array(days).fill(0);
+  list.forEach(b => {
+    if(!b.createdAt) return;
+    const dt = new Date(b.createdAt);
+    if(dt.getFullYear() === year && dt.getMonth() === monthIdx){
+      const idx = dt.getDate() - 1;
+      totals[idx] += b.paid;
+      counts[idx] += 1;
+    }
+  });
+  return { totals, counts };
+}
+
+function bucketsForYear(list, year){
+  const totals = new Array(12).fill(0);
+  const counts = new Array(12).fill(0);
+  list.forEach(b => {
+    if(!b.createdAt) return;
+    const dt = new Date(b.createdAt);
+    if(dt.getFullYear() === year){
+      totals[dt.getMonth()] += b.paid;
+      counts[dt.getMonth()] += 1;
+    }
+  });
+  return { totals, counts };
+}
+
+function navigateTrend(delta){
+  if(trendViewMode === 'monthly'){
+    trendMonthDate = new Date(trendMonthDate.getFullYear(), trendMonthDate.getMonth() + delta, 1);
+  }else{
+    trendYear += delta;
+  }
+  renderTrends();
+}
+
+function renderTrends(){
+  if(!loaded) return;
+  if(!els.trendChartCanvas) return;
+
+  let totals, counts, labels, periodLabel, unitLabel, periodNoun, prevTotals;
+
+  if(trendViewMode === 'monthly'){
+    const y = trendMonthDate.getFullYear(), m = trendMonthDate.getMonth();
+    ({ totals, counts } = bucketsForMonth(bookings, y, m));
+    labels = totals.map((_, i) => String(i + 1));
+    periodLabel = `${LONG_MONTHS[m]} ${y}`;
+    unitLabel = 'day';
+    periodNoun = 'month';
+    const prevDate = new Date(y, m - 1, 1);
+    prevTotals = bucketsForMonth(bookings, prevDate.getFullYear(), prevDate.getMonth()).totals;
+  }else{
+    const y = trendYear;
+    ({ totals, counts } = bucketsForYear(bookings, y));
+    labels = SHORT_MONTHS.slice();
+    periodLabel = String(y);
+    unitLabel = 'month';
+    periodNoun = 'year';
+    prevTotals = bucketsForYear(bookings, y - 1).totals;
+  }
+
+  els.trendPeriodLabel.textContent = periodLabel;
+
+  if(typeof Chart === 'undefined'){
+    els.trendSummary.innerHTML = '<div class="entry-dates">Chart library failed to load — check your connection and reload the page.</div>';
+    return;
+  }
+
+  const chartData = {
+    labels,
+    datasets: [{
+      label: 'Revenue (KES)',
+      data: totals,
+      backgroundColor: '#A87C2B',
+      hoverBackgroundColor: '#8C6621',
+      borderRadius: 4,
+      maxBarThickness: 28,
+    }]
+  };
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 250 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => 'KES ' + Number(ctx.parsed.y || 0).toLocaleString('en-US')
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#7A7267', font: { family: "'Inter',sans-serif", size: 11 } }
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: '#E4DDCE' },
+        ticks: {
+          color: '#7A7267',
+          font: { family: "'Inter',sans-serif", size: 11 },
+          callback: (v) => 'KES ' + Number(v).toLocaleString('en-US')
+        }
+      }
+    }
+  };
+
+  if(trendChartInstance){
+    trendChartInstance.data = chartData;
+    trendChartInstance.options = chartOptions;
+    trendChartInstance.update();
+  }else{
+    trendChartInstance = new Chart(els.trendChartCanvas.getContext('2d'), {
+      type: 'bar',
+      data: chartData,
+      options: chartOptions
+    });
+  }
+
+  /* ---- summary ---- */
+  const total = totals.reduce((a, b) => a + b, 0);
+  const txCount = counts.reduce((a, b) => a + b, 0);
+  const activeEntries = totals.map((v, i) => ({ v, i })).filter(x => x.v > 0);
+
+  let busiestHtml = '—', quietestHtml = '—';
+  if(activeEntries.length){
+    const busiest = activeEntries.reduce((a, b) => (b.v > a.v ? b : a));
+    const quietest = activeEntries.reduce((a, b) => (b.v < a.v ? b : a));
+    const labelFor = (i) => trendViewMode === 'monthly'
+      ? fmtDate(dateStrFromParts(trendMonthDate.getFullYear(), trendMonthDate.getMonth(), i + 1))
+      : `${LONG_MONTHS[i]} ${trendYear}`;
+    busiestHtml = `${fmtKES(busiest.v)} — ${labelFor(busiest.i)}`;
+    quietestHtml = `${fmtKES(quietest.v)} — ${labelFor(quietest.i)}`;
+  }
+
+  const avgPerActive = activeEntries.length ? total / activeEntries.length : 0;
+  const prevTotal = prevTotals.reduce((a, b) => a + b, 0);
+  let changeText;
+  if(prevTotal > 0){
+    const pct = ((total - prevTotal) / prevTotal) * 100;
+    changeText = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% (${fmtKES(total)} vs ${fmtKES(prevTotal)})`;
+  }else if(total > 0){
+    changeText = 'No revenue recorded in the prior period for comparison';
+  }else{
+    changeText = '—';
+  }
+
+  const narrative = total > 0
+    ? `${escapeHtml(currentProperty)} recorded ${fmtKES(total)} in revenue across ${txCount} booking${txCount === 1 ? '' : 's'} during ${periodLabel}.`
+    : `No revenue was recorded for ${escapeHtml(currentProperty)} during ${periodLabel}.`;
+
+  els.trendSummary.innerHTML = `
+    <div class="entry-name trend-summary-title">Summary — ${periodLabel}</div>
+    <div class="entry-dates trend-summary-narrative">${narrative}</div>
+    <div class="entry-grid">
+      <div><span class="k">Total revenue</span><br><span class="v">${fmtKES(total)}</span></div>
+      <div><span class="k">Bookings recorded</span><br><span class="v">${txCount}</span></div>
+      <div><span class="k">Busiest ${unitLabel}</span><br><span class="v">${busiestHtml}</span></div>
+      <div><span class="k">Quietest active ${unitLabel}</span><br><span class="v">${quietestHtml}</span></div>
+      <div><span class="k">Average per active ${unitLabel}</span><br><span class="v">${fmtKES(avgPerActive)}</span></div>
+      <div><span class="k">Change vs previous ${periodNoun}</span><br><span class="v">${changeText}</span></div>
+    </div>
+  `;
+}
+
+els.trendPrevBtn.addEventListener('click', () => navigateTrend(-1));
+els.trendNextBtn.addEventListener('click', () => navigateTrend(1));
+els.trendToggleBtns.forEach(btn => btn.addEventListener('click', () => {
+  const view = btn.dataset.view;
+  if(view === trendViewMode) return;
+  trendViewMode = view;
+  els.trendToggleBtns.forEach(b => b.classList.toggle('active', b === btn));
+  renderTrends();
+}));
+
+let trendTouchStartX = null;
+els.trendChartWrap.addEventListener('touchstart', (e) => {
+  trendTouchStartX = e.touches[0].clientX;
+}, { passive: true });
+els.trendChartWrap.addEventListener('touchend', (e) => {
+  if(trendTouchStartX === null) return;
+  const dx = e.changedTouches[0].clientX - trendTouchStartX;
+  trendTouchStartX = null;
+  if(Math.abs(dx) < 40) return;
+  if(dx < 0) navigateTrend(1); else navigateTrend(-1);
+}, { passive: true });
+
+/* ---------- init ---------- */
 (function(){
   const today = new Date().toISOString().slice(0,10);
   document.getElementById('checkIn').value = today;
