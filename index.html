@@ -332,7 +332,7 @@ select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-i
             <select id="receivedBy"><option>Sitter</option><option>Tamina</option><option>Kael</option><option>Ben</option></select>
           </div>
         </div>
-        <div class="field"><label>Notes (optional)</label><textarea id="notes" placeholder="Anything worth remembering about this stay"></textarea></div>
+        <div class="field"><label>Deposit status</label><button type="button" id="depositToggle" class="btn" data-status="to_be_paid" style="width:100%;background:var(--due-bg);color:var(--due);border:1.5px solid var(--due);">To Be Paid</button></div><div class="field"><label>Notes (optional)</label><textarea id="notes" placeholder="Anything worth remembering about this stay"></textarea></div>
         <button type="submit" class="btn btn-primary">Add to ledger</button>
       </form>
     </div>
@@ -459,7 +459,7 @@ function rowToBooking(row){
     agreed: Number(row.agreed),
     paid: Number(row.paid),
     method: row.method,
-    receivedBy: row.received_by,
+    receivedBy: row.received_by,depositStatus: row.deposit_status || 'to_be_paid',
     notes: row.notes,
     property: row.property,
     createdAt: row.created_at,
@@ -477,7 +477,7 @@ function bookingToRow(b){
     agreed: b.agreed,
     paid: b.paid,
     method: b.method,
-    received_by: b.receivedBy,
+    received_by: b.receivedBy,deposit_status: b.depositStatus || 'to_be_paid',
     notes: b.notes || null,
     property: b.property || currentProperty,
   };
@@ -532,7 +532,7 @@ function isTrendsActive(){
   const activeTab = document.querySelector('.tab.active');
   return !!activeTab && activeTab.dataset.tab === 'trends';
 }
-els.tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+els.tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));document.getElementById('depositToggle').addEventListener('click', function(){ var btn=this; var isPaidState = btn.dataset.status === 'paid'; var next = isPaidState ? 'to_be_paid' : 'paid'; btn.dataset.status = next; if(next==='paid'){ btn.textContent='Deposit Paid'; btn.style.background='var(--paid-bg)'; btn.style.color='var(--paid)'; btn.style.borderColor='var(--paid)'; } else { btn.textContent='To Be Paid'; btn.style.background='var(--due-bg)'; btn.style.color='var(--due)'; btn.style.borderColor='var(--due)'; } });
 
 function showMsg(text, type){
   els.formMsg.innerHTML = `<div class="form-msg ${type}">${text}</div>`;
@@ -557,7 +557,7 @@ els.form.addEventListener('submit', async (e) => {
     agreed: Number(document.getElementById('agreed').value) || 0,
     paid: Number(document.getElementById('paid').value) || 0,
     method: document.getElementById('method').value,
-    receivedBy: document.getElementById('receivedBy').value,
+    receivedBy: document.getElementById('receivedBy').value,depositStatus: document.getElementById('depositToggle').dataset.status,
     notes: document.getElementById('notes').value.trim(),
     property: currentProperty,
   };
@@ -571,7 +571,7 @@ els.form.addEventListener('submit', async (e) => {
     bookings.push(saved);
     showMsg('Guest added to the ledger.', 'success');
     els.form.reset();
-    document.getElementById('numGuests').value = 1;
+    document.getElementById('numGuests').value = 1;document.getElementById('depositToggle').dataset.status='to_be_paid';document.getElementById('depositToggle').textContent='To Be Paid';document.getElementById('depositToggle').style.background='var(--due-bg)';document.getElementById('depositToggle').style.color='var(--due)';document.getElementById('depositToggle').style.borderColor='var(--due)';
     render();
     switchTab('ledger');
   }catch(e){
@@ -608,7 +608,7 @@ async function markPaid(id){
   }
 }
 
-function render(){
+async function toggleDeposit(id){ const b = bookings.find(x => x.id === id); if(!b) return; const next = b.depositStatus === 'paid' ? 'to_be_paid' : 'paid'; try{ const { error } = await sb.from('bookings').update({ deposit_status: next }).eq('id', id); if(error) throw error; b.depositStatus = next; render(); }catch(e){ console.error('deposit update error:', e); alert("Couldn't update deposit status — check your connection and try again."); } }function render(){
   renderStats();
   renderBreakdown();
   renderLedger();renderMonthly();renderPettyCash();
@@ -618,14 +618,14 @@ function render(){
 function renderStats(){
   const totalGuests = bookings.length;
   const totalIncome = bookings.reduce((s,b) => s + b.paid, 0);
-  const totalDue = bookings.reduce((s,b) => s + Math.max(0, b.agreed - b.paid), 0);
+  const todayStr = new Date().toISOString().slice(0,10); const startedBookings = bookings.filter(b => b.checkIn && b.checkIn <= todayStr); const upcomingBookings = bookings.filter(b => b.checkIn && b.checkIn > todayStr); const totalDue = startedBookings.reduce((s,b) => s + Math.max(0, b.agreed - b.paid), 0); const upcomingDue = upcomingBookings.reduce((s,b) => s + Math.max(0, b.agreed - b.paid), 0);
   const mKey = thisMonthKey();
   const monthIncome = bookings.filter(b => b.checkIn && b.checkIn.slice(0,7) === mKey).reduce((s,b) => s + b.paid, 0);
   els.stats.innerHTML = `
     <div class="stat"><div class="label">Total Stays</div><div class="value">${totalGuests}</div></div>
     <div class="stat"><div class="label">Collected So Far</div><div class="value">${fmtKES(totalIncome)}</div></div>
     <div class="stat"><div class="label">This Month</div><div class="value">${fmtKES(monthIncome)}</div></div>
-    <div class="stat due"><div class="label">Outstanding</div><div class="value">${fmtKES(totalDue)}</div></div>
+    <div class="stat due"><div class="label">Outstanding</div><div class="value">${fmtKES(totalDue)}</div>${upcomingDue > 0 ? `<div style="font-size:10.5px;font-weight:600;color:var(--due);margin-top:3px;opacity:.8;">+${fmtKES(upcomingDue).replace('KES ','')} from upcoming bookings</div>` : ''}</div>
   `;
 }
 
@@ -657,7 +657,7 @@ function renderLedger(){
             <div class="entry-name">${escapeHtml(b.guestName)}</div>
             <div class="entry-dates">${fmtDate(b.checkIn)} → ${fmtDate(b.checkOut)} · ${nightsBetween(b.checkIn,b.checkOut)} night(s) · ${b.numGuests} guest(s)</div>
           </div>
-          <div class="stamp ${isPaid ? 'paid' : 'due'}">${isPaid ? 'Paid' : 'Due'}</div>
+          <div class="stamp ${isPaid ? 'paid' : 'due'}">${isPaid ? 'Paid' : 'Due'}</div>${b.depositStatus !== 'paid' ? '<div class="stamp due" style="margin-top:6px;font-size:9px;transform:rotate(-2deg);">Deposit Due</div>' : ''}
         </div>
         <hr class="entry-divider">
         <div class="entry-grid">
@@ -670,7 +670,7 @@ function renderLedger(){
         </div>
         ${b.notes ? `<div class="entry-notes">"${escapeHtml(b.notes)}"</div>` : ''}
         <div class="entry-actions">
-          ${!isPaid ? `<button class="btn btn-paid" onclick="markPaid(${b.id})">Mark fully paid</button>` : ''}
+          ${!isPaid ? `<button class="btn btn-paid" onclick="markPaid(${b.id})">Mark fully paid</button>` : ''}${b.depositStatus === 'paid' ? '' : `<button class="btn" style="background:var(--due-bg);color:var(--due);border:1px solid var(--due);padding:7px 12px;font-size:12px;" onclick="toggleDeposit(${b.id})">Mark deposit paid</button>`}
           <button class="btn btn-ghost" onclick="deleteEntry(${b.id})">Delete</button>
         </div>
       </div>
