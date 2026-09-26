@@ -316,7 +316,7 @@ select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-i
         </div>
         <div class="row2">
           <div class="field"><label>Number of guests</label><input type="number" id="numGuests" min="1" value="1" required></div>
-          <div class="field"><label>Room / unit (optional)</label><input type="text" id="unit" placeholder="e.g. Main house"></div>
+          <div class="field"><label>Room</label><div class="trend-toggle" id="floorPicker"><div class="trend-toggle-btn" data-floor="2nd Floor">2nd Floor</div><div class="trend-toggle-btn" data-floor="1st Floor">1st Floor</div><div class="trend-toggle-btn" data-floor="Ground Floor">Ground Floor</div></div><div class="trend-toggle" id="roomTypePicker" style="margin-top:6px;"></div><input type="hidden" id="unit"></div>
         </div>
         <div class="row2">
           <div class="field"><label>Agreed total (KES)</label><input type="number" id="agreed" min="0" step="1" required placeholder="0"></div>
@@ -386,7 +386,7 @@ const els = {
   breakdown: document.getElementById('breakdown'),
   ledgerList: document.getElementById('ledgerList'), monthlyList: document.getElementById('monthlyList'), pcStats: document.getElementById('pcStats'), pettyCashList: document.getElementById('pettyCashList'),
   propBtns: document.querySelectorAll('.prop-btn'),
-  trendToggleBtns: document.querySelectorAll('.trend-toggle-btn'),
+  trendToggleBtns: document.querySelectorAll('#trendToggle .trend-toggle-btn'),
   trendPrevBtn: document.getElementById('trendPrevBtn'),
   trendNextBtn: document.getElementById('trendNextBtn'),
   trendPeriodLabel: document.getElementById('trendPeriodLabel'),
@@ -443,7 +443,7 @@ function switchProperty(property){
   loadBookings();
   loadPettyCash();loadOverrides();
 }
-els.propBtns.forEach(b => b.addEventListener('click', () => switchProperty(b.dataset.property)));
+els.propBtns.forEach(b => b.addEventListener('click', () => switchProperty(b.dataset.property)));let roomPickerLastProperty=null;let selectedFloor=null;let selectedRoomType=null;const ROOM_TYPES_WITH_SINGLE=['3BR','2BR','1BR','Single'];const ROOM_TYPES_NO_SINGLE=['3BR','2BR','1BR'];function floorRoomTypes(floor){return floor==='Ground Floor'?ROOM_TYPES_NO_SINGLE:ROOM_TYPES_WITH_SINGLE;}function parseUnit(unitStr){if(!unitStr)return null;const parts=unitStr.split(' — ');if(parts.length!==3)return null;return {property:parts[0],floor:parts[1],roomType:parts[2]};}function datesOverlap(aIn,aOut,bIn,bOut){if(!aIn||!aOut||!bIn||!bOut)return false;return new Date(aIn)<new Date(bOut)&&new Date(bIn)<new Date(aOut);}function getBlockedRoomTypes(floor){return new Set();}function updateUnitValue(){const unitInput=document.getElementById('unit');if(!unitInput)return;unitInput.value=(selectedFloor&&selectedRoomType)?`${currentProperty} — ${selectedFloor} — ${selectedRoomType}`:'';}function renderRoomTypeOptions(){const wrap=document.getElementById('roomTypePicker');if(!wrap)return;const floor=selectedFloor;const types=floor?floorRoomTypes(floor):[];const blocked=floor?getBlockedRoomTypes(floor):new Set();if(selectedRoomType&&blocked.has(selectedRoomType)){selectedRoomType=null;}wrap.innerHTML=types.map(t=>{const isBlocked=blocked.has(t);const isActive=t===selectedRoomType;const style=isBlocked?' style="opacity:.35;cursor:not-allowed;text-decoration:line-through;"':'';return `<div class="trend-toggle-btn${isActive?' active':''}" data-roomtype="${t}" data-blocked="${isBlocked}"${style}>${t}</div>`;}).join('');wrap.querySelectorAll('.trend-toggle-btn').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.blocked==='true')return;selectedRoomType=btn.dataset.roomtype;renderRoomTypeOptions();updateUnitValue();}));updateUnitValue();}function syncRoomPicker(){const floorPicker=document.getElementById('floorPicker');if(!floorPicker)return;if(roomPickerLastProperty!==currentProperty){roomPickerLastProperty=currentProperty;selectedFloor=(currentProperty==='Kasarani')?'Ground Floor':null;selectedRoomType=null;floorPicker.style.display=(currentProperty==='Kasarani')?'none':'';floorPicker.querySelectorAll('.trend-toggle-btn').forEach(b=>b.classList.remove('active'));}renderRoomTypeOptions();}function resetRoomPicker(){selectedFloor=(currentProperty==='Kasarani')?'Ground Floor':null;selectedRoomType=null;const fp=document.getElementById('floorPicker');if(fp)fp.querySelectorAll('.trend-toggle-btn').forEach(b=>b.classList.remove('active'));renderRoomTypeOptions();}var ciChangeEl=document.getElementById('checkIn');if(ciChangeEl)ciChangeEl.addEventListener('change',renderRoomTypeOptions);var coChangeEl=document.getElementById('checkOut');if(coChangeEl)coChangeEl.addEventListener('change',renderRoomTypeOptions);document.querySelectorAll('#floorPicker .trend-toggle-btn').forEach(btn=>btn.addEventListener('click',()=>{if(currentProperty==='Kasarani')return;selectedFloor=btn.dataset.floor;document.querySelectorAll('#floorPicker .trend-toggle-btn').forEach(b=>b.classList.toggle('active',b===btn));selectedRoomType=null;renderRoomTypeOptions();updateUnitValue();}));
 
 /* ---------- row <-> app object mapping ---------- */
 function rowToBooking(row){
@@ -570,7 +570,7 @@ els.form.addEventListener('submit', async (e) => {
     const saved = await insertBooking(entry);
     bookings.push(saved);
     showMsg('Guest added to the ledger.', 'success');
-    els.form.reset();
+    els.form.reset();resetRoomPicker();
     document.getElementById('numGuests').value = 1;document.getElementById('depositPaid').value = 0;updateDepositIndicator();
     render();
     switchTab('ledger');
@@ -608,7 +608,7 @@ async function markPaid(id){
   }
 }
 
-async function saveDeposit(id){ const input = document.getElementById('depositInput' + id); if(!input) return; const val = Number(input.value) || 0; const b = bookings.find(x => x.id === id); if(!b) return; try{ const { error } = await sb.from('bookings').update({ deposit_paid: val }).eq('id', id); if(error) throw error; b.depositPaid = val; render(); }catch(e){ console.error('deposit update error:', e); alert("Couldn't update deposit amount — check your connection and try again."); } }function render(){
+async function saveDeposit(id){ const input = document.getElementById('depositInput' + id); if(!input) return; const val = Number(input.value) || 0; const b = bookings.find(x => x.id === id); if(!b) return; try{ const { error } = await sb.from('bookings').update({ deposit_paid: val }).eq('id', id); if(error) throw error; b.depositPaid = val; render(); }catch(e){ console.error('deposit update error:', e); alert("Couldn't update deposit amount — check your connection and try again."); } }function render(){syncRoomPicker();
   renderStats();
   renderBreakdown();
   renderLedger();renderMonthly();renderPettyCash();renderOverrideList();
